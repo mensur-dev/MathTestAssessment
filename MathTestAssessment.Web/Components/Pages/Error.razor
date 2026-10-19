@@ -1,0 +1,33 @@
+﻿@page "/Error"
+@using System.Diagnostics
+
+<PageTitle>Error - ExamManagement</PageTitle>
+
+<div class="container text-center mt-5">
+    <h3>Something went wrong</h3>
+
+    <p>
+        An unexpected error occurred.
+        Please try again later.
+    </p>
+
+    @if (!string.IsNullOrEmpty(RequestId))
+    {
+        <small class="text-muted">
+            Request ID: @RequestId
+        </small>
+    }
+</div>
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    private string? RequestId;
+
+    protected override void OnInitialized()
+    {
+        RequestId = Activity.Current?.Id
+            ?? HttpContext?.TraceIdentifier;
+    }
+}

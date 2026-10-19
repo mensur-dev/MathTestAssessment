@@ -1,0 +1,275 @@
+@page "/analytics"
+@attribute [Authorize(Roles = "Teacher,Student")]
+@inherits ApiPage
+
+<PageTitle>Exam analytics</PageTitle>
+
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">RESULTS & PROGRESS</p>
+
+        <h1>
+            @(isStudent ? "My performance" : "Student performance")
+        </h1>
+
+        <p>
+            Explore each exam and see exactly which answers were correct.
+        </p>
+    </div>
+</div>
+
+<OperationStatus Busy="Busy" Error="@Error" />
+
+<div class="page-actions">
+    @if (!isStudent)
+    {
+        <RadzenDropDown TValue="Guid?"
+                        Data="students"
+                        TextProperty="DisplayName"
+                        ValueProperty="Id"
+                        @bind-Value="selectedId"
+                        Placeholder="Search student"
+                        AllowFiltering="true"
+                        LoadData="LoadStudents"
+                        Disabled="Busy"
+                        aria-label="Student"
+                        Change="StudentChanged"
+                        Style="min-width:280px" />
+    }
+
+    <RadzenButton Text="Refresh results"
+                  Icon="refresh"
+                  Click="Load"
+                  Disabled="@(Busy || selectedId is null)" />
+</div>
+
+@if (analytics is not null)
+{
+    <div class="metrics-grid">
+        <div class="metric">
+            <span>Exams</span>
+            <strong>@analytics.TotalExams</strong>
+        </div>
+
+        <div class="metric">
+            <span>Total tasks across all exams</span>
+            <strong>@analytics.TotalTasks</strong>
+            <small>Grouped by exam below</small>
+        </div>
+
+        <div class="metric">
+            <span>Accuracy on evaluated tasks</span>
+
+            <strong>
+                @(analytics.CorrectTasks + analytics.IncorrectTasks == 0
+                    ? "—"
+                    : analytics.AverageScorePercentage.ToString("0.##") + "%")
+            </strong>
+        </div>
+    </div>
+
+    <div class="analytics-summary-grid">
+        <RadzenCard class="analytics-chart-card">
+            <h2>Task result distribution</h2>
+
+            <p class="muted">
+                All tasks from the exams shown below.
+            </p>
+
+            <RadzenChart Style="height: 300px">
+                <RadzenColumnSeries TItem="ChartPoint"
+                                    Data="chartData"
+                                    CategoryProperty="Category"
+                                    ValueProperty="Value"
+                                    Title="Tasks" />
+
+                <RadzenCategoryAxis Padding="20" />
+
+                <RadzenValueAxis Min="0">
+                    <RadzenGridLines Visible="true" />
+                    <RadzenAxisTitle Text="Number of tasks" />
+                </RadzenValueAxis>
+            </RadzenChart>
+        </RadzenCard>
+
+        <RadzenCard class="analytics-result-card">
+            <h2>Results</h2>
+
+            <div class="performance-legend vertical">
+                <span class="result-pill correct">
+                    @analytics.CorrectTasks correct
+                </span>
+
+                <span class="result-pill incorrect">
+                    @analytics.IncorrectTasks incorrect
+                </span>
+
+                <span class="result-pill pending">
+                    @analytics.UnevaluatedTasks not evaluated
+                </span>
+            </div>
+
+            <p class="muted">
+                Scores use correct ÷ evaluated tasks.
+                Tasks with calculation errors are excluded from the score.
+            </p>
+        </RadzenCard>
+    </div>
+
+    <div class="page-heading">
+        <h2>Exam breakdown</h2>
+
+        <span class="muted">
+            Expand an exam to see its tasks
+        </span>
+    </div>
+
+    @if (exams.Count == 0)
+    {
+        <RadzenCard>
+            No exams available for this student.
+        </RadzenCard>
+    }
+
+    <ExamCards Exams="exams" />
+
+    @if (totalExams > pageSize)
+    {
+        <div class="pagination-actions">
+            <RadzenButton Text="Previous"
+                          Icon="chevron_left"
+                          ButtonStyle="ButtonStyle.Light"
+                          Click="@(() => ChangeExamPage(-1))"
+                          Disabled="@(Busy || examPage == 1)" />
+
+            <span>
+                Page @examPage of
+                @((int)Math.Ceiling((double)totalExams / pageSize))
+            </span>
+
+            <RadzenButton Text="Next"
+                          Icon="chevron_right"
+                          IconPosition="IconPosition.Right"
+                          ButtonStyle="ButtonStyle.Light"
+                          Click="@(() => ChangeExamPage(1))"
+                          Disabled="@(Busy || examPage * pageSize >= totalExams)" />
+        </div>
+    }
+}
+else if (!Busy && Error is null)
+{
+    <RadzenCard>
+        @(isStudent
+            ? "No student profile is linked to your account. Contact your administrator."
+            : "Select a student to view their exams.")
+    </RadzenCard>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "studentId")]
+    public Guid? StudentId { get; set; }
+
+    private List<StudentOption> students = [];
+    private List<ExamDto> exams = [];
+    private List<ChartPoint> chartData = [];
+
+    private StudentAnalyticsDto? analytics;
+
+    private const int pageSize = 10;
+
+    private int examPage = 1;
+    private int totalExams;
+
+    private Guid? selectedId;
+    private bool isStudent;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var user = (await Auth.GetAuthenticationStateAsync()).User;
+
+        isStudent = !user.IsInRole("Teacher");
+
+        selectedId = isStudent
+            ? (Guid.TryParse(user.FindFirst("StudentId")?.Value, out var id)
+                ? id
+                : null)
+            : StudentId;
+
+        if (!isStudent)
+        {
+            await LoadStudents(new LoadDataArgs());
+        }
+
+        if (selectedId is not null)
+        {
+            await Load();
+        }
+    }
+
+    private Task StudentChanged(object _)
+    {
+        examPage = 1;
+        return Load();
+    }
+
+    private Task LoadStudents(LoadDataArgs args) => Run(async () =>
+    {
+        students = (await Api.GetAsync<List<StudentDto>>(
+                $"api/students/search?search={Uri.EscapeDataString(args.Filter ?? string.Empty)}",
+                Auth.AccessToken) ?? [])
+            .Select(student => new StudentOption(
+                student.Id,
+                $"{student.FirstName} {student.LastName} · {student.ExternalStudentId}"))
+            .ToList();
+    });
+
+    private Task Load() => Run(async () =>
+    {
+        analytics = null;
+        exams = [];
+        chartData = [];
+        totalExams = 0;
+
+        if (selectedId is null)
+        {
+            return;
+        }
+
+        var data = await Api.GetAsync<StudentAnalyticsDto>(
+            $"api/analytics/students/{selectedId}",
+            Auth.AccessToken);
+
+        var examResult = await Api.GetAsync<PagedResponse<ExamDto>>(
+            $"api/analytics/students/{selectedId}/exams?page={examPage}&pageSize={pageSize}",
+            Auth.AccessToken);
+
+        exams = examResult?.Items ?? [];
+        totalExams = examResult?.TotalCount ?? 0;
+
+        analytics = data;
+
+        if (analytics is not null)
+        {
+            chartData =
+            [
+                new("Correct", analytics.CorrectTasks),
+                new("Incorrect", analytics.IncorrectTasks),
+                new("Not evaluated", analytics.UnevaluatedTasks)
+            ];
+        }
+    });
+
+    private async Task ChangeExamPage(int delta)
+    {
+        examPage += delta;
+        await Load();
+    }
+
+    private sealed record StudentOption(
+        Guid Id,
+        string DisplayName);
+
+    private sealed record ChartPoint(
+        string Category,
+        int Value);
+}

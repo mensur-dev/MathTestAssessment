@@ -1,0 +1,219 @@
+@page "/users/create"
+@attribute [Authorize(Roles = "Admin")]
+@inherits ApiPage
+
+<PageTitle>Create @SelectedRole.ToLowerInvariant() account</PageTitle>
+
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">ACCOUNT MANAGEMENT</p>
+
+        <h1>Create @SelectedRole.ToLowerInvariant() account</h1>
+
+        <p>
+            @(SelectedRole == "Teacher"
+                ? "Enter a new teacher's profile and login details."
+                : "Create a login for a student who was already registered by a teacher.")
+        </p>
+    </div>
+</div>
+
+<OperationStatus Busy="Busy" Error="@Error" />
+
+<RadzenCard class="account-form-card">
+    <RadzenTemplateForm TItem="RegisterUserDto"
+                        Data="model"
+                        Submit="Save">
+
+        <RadzenStack Gap="1rem">
+            @if (SelectedRole == "Teacher")
+            {
+                <RadzenTextBox Name="Email"
+                               @bind-Value="model.Email"
+                               Placeholder="Email"
+                               aria-label="Email" />
+
+                <RadzenRequiredValidator Component="Email"
+                                         Text="Email is required." />
+
+                <RadzenEmailValidator Component="Email"
+                                      Text="Enter a valid email." />
+
+                <RadzenPassword Name="Password"
+                                @bind-Value="model.Password"
+                                Placeholder="Password"
+                                aria-label="Password" />
+
+                <RadzenRequiredValidator Component="Password"
+                                         Text="Password is required." />
+
+                <RadzenPassword Name="ConfirmPassword"
+                                @bind-Value="confirmPassword"
+                                Placeholder="Confirm password"
+                                aria-label="Confirm password" />
+
+                <RadzenRequiredValidator Component="ConfirmPassword"
+                                         Text="Confirm password is required." />
+
+                <RadzenCompareValidator Component="ConfirmPassword"
+                                        Value="@model.Password"
+                                        Text="Passwords do not match." />
+
+                <RadzenTextBox Name="FirstName"
+                               @bind-Value="model.FirstName"
+                               Placeholder="First name"
+                               aria-label="First name" />
+
+                <RadzenRequiredValidator Component="FirstName"
+                                         Text="First name is required." />
+
+                <RadzenTextBox Name="LastName"
+                               @bind-Value="model.LastName"
+                               Placeholder="Last name"
+                               aria-label="Last name" />
+
+                <RadzenRequiredValidator Component="LastName"
+                                         Text="Last name is required." />
+
+                <RadzenTextBox Name="TeacherCode"
+                               @bind-Value="model.ExternalTeacherId"
+                               Placeholder="ID"
+                               aria-label="ID" />
+
+                <RadzenRequiredValidator Component="TeacherCode"
+                                         Text="ID is required." />
+            }
+            else
+            {
+                <RadzenDropDown TValue="Guid?"
+                                Name="Student"
+                                Data="students"
+                                TextProperty="DisplayName"
+                                ValueProperty="Id"
+                                @bind-Value="model.StudentId"
+                                Placeholder="Select student without an account"
+                                AllowFiltering="true"
+                                LoadData="LoadStudentOptions"
+                                aria-label="Student" />
+
+                <RadzenRequiredValidator Component="Student"
+                                         Text="Select a student." />
+
+                <RadzenTextBox Name="Email"
+                               @bind-Value="model.Email"
+                               Placeholder="Email"
+                               aria-label="Email" />
+
+                <RadzenRequiredValidator Component="Email"
+                                         Text="Email is required." />
+
+                <RadzenEmailValidator Component="Email"
+                                      Text="Enter a valid email." />
+
+                <RadzenPassword Name="Password"
+                                @bind-Value="model.Password"
+                                Placeholder="Password"
+                                aria-label="Password" />
+
+                <RadzenRequiredValidator Component="Password"
+                                         Text="Password is required." />
+
+                <RadzenPassword Name="ConfirmPassword"
+                                @bind-Value="confirmPassword"
+                                Placeholder="Confirm password"
+                                aria-label="Confirm password" />
+
+                <RadzenRequiredValidator Component="ConfirmPassword"
+                                         Text="Confirm password is required." />
+
+                <RadzenCompareValidator Component="ConfirmPassword"
+                                        Value="@model.Password"
+                                        Text="Passwords do not match." />
+            }
+
+            <p class="form-help">
+                Password: at least 8 characters, including a lowercase letter
+                and a digit. The user must replace it at first sign-in.
+            </p>
+
+            <RadzenStack Orientation="Orientation.Horizontal"
+                         Gap="0.75rem">
+
+                <RadzenButton Text="Create account"
+                              Icon="person_add"
+                              ButtonType="ButtonType.Submit"
+                              Disabled="Busy" />
+
+                <RadzenButton Text="Cancel"
+                              Icon="close"
+                              ButtonStyle="ButtonStyle.Light"
+                              Click="Back"
+                              Disabled="Busy" />
+
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenTemplateForm>
+</RadzenCard>
+
+@code {
+    [SupplyParameterFromQuery(Name = "role")]
+    public string? Role { get; set; }
+
+    private string SelectedRole =>
+        string.Equals(Role, "Student", StringComparison.OrdinalIgnoreCase)
+            ? "Student"
+            : "Teacher";
+
+    private RegisterUserDto model = new();
+    private string confirmPassword = string.Empty;
+    private List<StudentDto> students = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        model = new RegisterUserDto
+        {
+            Role = SelectedRole
+        };
+
+        confirmPassword = string.Empty;
+
+        if (SelectedRole == "Student")
+        {
+            await LoadStudentOptions(new LoadDataArgs());
+        }
+    }
+
+    private Task Save() => Run(async () =>
+    {
+        if (model.Password != confirmPassword)
+        {
+            return;
+        }
+
+        await Api.SendAsync(
+            HttpMethod.Post,
+            "api/auth/register",
+            model,
+            Auth.AccessToken);
+
+        Saved("User account created. The password must be changed at first sign-in.");
+
+        Back();
+    });
+
+    private void Back()
+    {
+        Navigation.NavigateTo(
+            $"/users?role={Uri.EscapeDataString(SelectedRole)}");
+    }
+
+    private Task LoadStudentOptions(LoadDataArgs args) => Run(async () =>
+    {
+        var search = Uri.EscapeDataString(
+            args.Filter ?? string.Empty);
+
+        students = await Api.GetAsync<List<StudentDto>>(
+            $"api/admin/student-options?search={search}",
+            Auth.AccessToken) ?? [];
+    });
+}

@@ -1,0 +1,153 @@
+@page "/login"
+
+@using System.Net
+@using MathTestAssessment.Web.Services
+
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+@inject ILogger<Login> Logger
+
+<PageTitle>Login - MathTestAssessment</PageTitle>
+@if (SessionExpired)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Warning">The API could not validate your session. Please sign in again.</RadzenAlert>
+}
+
+<div class="login-container">
+
+    <RadzenCard class="login-card">
+
+        <RadzenStack Gap="1.5rem">
+
+            <div class="login-heading">
+                <RadzenIcon Icon="school"
+                            Style="font-size: 44px; color: #4f46e5;" />
+
+                <h1>MathTestAssessment</h1>
+
+                <p>Sign in to your account</p>
+            </div>
+
+            <RadzenTemplateForm
+                TItem="LoginForm"
+                Data="@_model"
+                Submit="@HandleLogin">
+
+                <RadzenStack Gap="1.2rem">
+
+                    <div>
+                        <RadzenLabel Text="Email" />
+
+                        <RadzenTextBox
+                            Name="Email"
+                            @bind-Value="_model.Email"
+                            Placeholder="Enter your email"
+                            Style="width: 100%;" />
+
+                        <RadzenRequiredValidator
+                            Component="Email"
+                            Text="Email is required"
+                            Style="display: block;" />
+                    </div>
+
+                    <div>
+                        <RadzenLabel Text="Password" />
+
+                        <RadzenPassword
+                            Name="Password"
+                            @bind-Value="_model.Password"
+                            Placeholder="Enter your password"
+                            Style="width: 100%;" />
+
+                        <RadzenRequiredValidator
+                            Component="Password"
+                            Text="Password is required"
+                            Style="display: block;" />
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(_error))
+                    {
+                        <RadzenAlert
+                            AlertStyle="AlertStyle.Danger">
+                            @_error
+                        </RadzenAlert>
+                    }
+
+                    <RadzenButton
+                        Text="Sign In"
+                        Icon="login"
+                        ButtonType="ButtonType.Submit"
+                        ButtonStyle="ButtonStyle.Primary"
+                        Disabled="@_loading"
+                        Style="width: 100%; height: 44px;" />
+
+                </RadzenStack>
+
+            </RadzenTemplateForm>
+
+        </RadzenStack>
+
+    </RadzenCard>
+
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "sessionExpired")]
+    public bool SessionExpired { get; set; }
+    private readonly LoginForm _model = new();
+
+    private bool _loading;
+    private string? _error;
+
+    private async Task HandleLogin(LoginForm model)
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var success = await AuthService.LoginAsync(
+                model.Email,
+                model.Password);
+
+            if (!success)
+            {
+                _error = "Login failed. Please try again.";
+                return;
+            }
+
+            Navigation.NavigateTo(AuthService.MustChangePassword ? "/change-password" : "/");
+        }
+        catch (HttpRequestException ex)
+            when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            _error = "Invalid email or password.";
+        }
+        catch (HttpRequestException ex)
+        {
+            Logger.LogWarning(
+                ex,
+                "Login API request failed.");
+
+            _error = "Unable to connect to the server.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(
+                ex,
+                "Unexpected login error.");
+
+            _error = "An unexpected error occurred.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private sealed class LoginForm
+    {
+        public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+    }
+}

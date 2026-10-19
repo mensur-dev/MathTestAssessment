@@ -1,0 +1,13 @@
+# Generated build and IDE files
+**/bin/
+**/obj/
+.vs/
+**/*.csproj.user
+*.suo
+*.user
+TestResults/
+**/TestResults/
+*.log
+
+# Local XML uploads and application state; keep the supplied Samples directory
+MathTestAssessment.Api/App_Data/

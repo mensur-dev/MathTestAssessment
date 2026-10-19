@@ -1,0 +1,68 @@
+@inject AuthService Auth
+
+@if (_restored)
+{
+    <CascadingAuthenticationState>
+        <Router AppAssembly="typeof(Program).Assembly"
+                NotFoundPage="typeof(Pages.NotFound)">
+
+            <Found Context="routeData">
+                <AuthorizeView>
+                    <Authorized Context="routeSession">
+                        @if (Auth.MustChangePassword && routeData.PageType != typeof(Pages.ChangePassword))
+                        {
+                            <RedirectToChangePassword />
+                        }
+                        else
+                        {
+                            <AuthorizeRouteView RouteData="routeData"
+                                                DefaultLayout="typeof(Layout.MainLayout)">
+
+                                <NotAuthorized>
+                                    <RadzenAlert AlertStyle="AlertStyle.Warning">
+                                        You are not authorized to access this page.
+                                    </RadzenAlert>
+                                </NotAuthorized>
+
+                            </AuthorizeRouteView>
+
+                            <FocusOnNavigate RouteData="routeData"
+                                             Selector="h1" />
+                        }
+                    </Authorized>
+
+                    <NotAuthorized>
+                        @if (routeData.PageType == typeof(Pages.Login))
+                        {
+                            <RouteView RouteData="routeData"
+                                       DefaultLayout="typeof(Layout.MainLayout)" />
+                        }
+                        else
+                        {
+                            <RedirectToLogin />
+                        }
+                    </NotAuthorized>
+                </AuthorizeView>
+            </Found>
+
+        </Router>
+    </CascadingAuthenticationState>
+}
+
+@code {
+    private bool _restored;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await Auth.RestoreAsync();
+
+        _restored = true;
+
+        StateHasChanged();
+    }
+}

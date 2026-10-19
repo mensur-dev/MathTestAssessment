@@ -1,0 +1,17 @@
+[
+  {
+    "Name": "API and Blazor",
+    "Projects": [
+      {
+        "Path": "MathTestAssessment.Api\\MathTestAssessment.Api.csproj",
+        "Action": "Start",
+        "DebugTarget": "https"
+      },
+      {
+        "Path": "MathTestAssessment.Web\\MathTestAssessment.Web.csproj",
+        "Action": "Start",
+        "DebugTarget": "https"
+      }
+    ]
+  }
+]

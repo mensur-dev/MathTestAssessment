@@ -1,0 +1,234 @@
+@page "/imports/{Id:guid}"
+@attribute [Authorize(Roles = "Teacher")]
+@inherits ApiPage
+@implements IAsyncDisposable
+
+<PageTitle>Import status</PageTitle>
+
+<h1>Import status</h1>
+
+<RadzenLink Path="/imports"
+            Text="Back to XML imports" />
+
+<OperationStatus Busy="Busy"
+                 Error="@Error" />
+
+<RadzenButton Text="Refresh status"
+              Icon="refresh"
+              Click="Load"
+              Disabled="Busy"
+              class="rz-ml-4" />
+
+@if (job is not null)
+{
+    <RadzenCard class="rz-my-4">
+        <h2>@job.Status</h2>
+
+        @if (!string.IsNullOrWhiteSpace(job.FileName))
+        {
+            <p>File: @job.FileName</p>
+        }
+
+        <p>Job ID: @job.Id</p>
+
+        <p>Attempts: @job.AttemptCount</p>
+
+        <p>
+            Created (UTC):
+            @job.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm:ss")
+        </p>
+
+        <p>
+            Started (UTC):
+            @(job.StartedAtUtc?.ToString("yyyy-MM-dd HH:mm:ss") ?? "Not started")
+        </p>
+
+        <p>
+            Completed (UTC):
+            @(job.CompletedAtUtc?.ToString("yyyy-MM-dd HH:mm:ss") ?? "Not completed")
+        </p>
+
+        @if (job.Status is ImportJobStatus.Pending or ImportJobStatus.Processing)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Info">
+                XML file received. Validation and processing are in progress.
+                Status updates automatically every 2 seconds.
+            </RadzenAlert>
+        }
+        else if (job.Status == ImportJobStatus.Failed)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Danger">
+                @(job.ErrorMessage
+                    ?? "The import failed. No successful result is available. Review the XML file before uploading again.")
+            </RadzenAlert>
+        }
+        else if (job.Status == ImportJobStatus.NeedsReview)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Warning">
+                The import requires review. Its result is being checked.
+            </RadzenAlert>
+        }
+
+        @if (job.Status == ImportJobStatus.Completed)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Success">
+                Exams imported successfully.
+            </RadzenAlert>
+
+            <RadzenLink Path="/exams"
+                        Text="View imported exams" />
+
+            @if (summary is not null)
+            {
+                <h2>Import results</h2>
+
+                <p>
+                    @summary.StudentCount students ·
+                    @summary.ExamCount exams ·
+                    @summary.TaskCount total tasks
+                </p>
+
+                <RadzenDataGrid TItem="ImportedExamSummaryDto"
+                                Data="summary.Exams"
+                                AllowPaging="true"
+                                PagerAlwaysVisible="true"
+                                ShowPagingSummary="true"
+                                PagingSummaryFormat="Page {0} of {1} ({2} records)"
+                                FirstPageTitle="First page"
+                                FirstPageAriaLabel="First page"
+                                PrevPageLabel="Previous"
+                                NextPageLabel="Next"
+                                LastPageTitle="Last page"
+                                LastPageAriaLabel="Last page"
+                                PageSize="10">
+
+                    <Columns>
+                        <RadzenDataGridColumn TItem="ImportedExamSummaryDto"
+                                              Property="ExternalStudentId"
+                                              Title="Student" />
+
+                        <RadzenDataGridColumn TItem="ImportedExamSummaryDto"
+                                              Property="ExternalExamId"
+                                              Title="Exam" />
+
+                        <RadzenDataGridColumn TItem="ImportedExamSummaryDto"
+                                              Property="TaskCount"
+                                              Title="Tasks in this exam" />
+
+                        <RadzenDataGridColumn TItem="ImportedExamSummaryDto"
+                                              Property="CorrectTasks"
+                                              Title="Correct" />
+
+                        <RadzenDataGridColumn TItem="ImportedExamSummaryDto"
+                                              Property="IncorrectTasks"
+                                              Title="Incorrect" />
+
+                        <RadzenDataGridColumn TItem="ImportedExamSummaryDto"
+                                              Property="UnevaluatedTasks"
+                                              Title="Not evaluated" />
+
+                        <RadzenDataGridColumn TItem="ImportedExamSummaryDto"
+                                              Title="Results">
+
+                            <Template Context="item">
+                                <RadzenLink Path="@($"/exams/{item.ExamId}")"
+                                            Text="View tasks" />
+                            </Template>
+
+                        </RadzenDataGridColumn>
+                    </Columns>
+
+                </RadzenDataGrid>
+            }
+            else
+            {
+                <p>
+                    This import predates detailed import summaries.
+                    Its exams remain available in the exam list.
+                </p>
+            }
+        }
+    </RadzenCard>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private ImportJobDto? job;
+    private ImportSummaryDto? summary;
+
+    private CancellationTokenSource? polling;
+    private Task? pollTask;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await StopPolling();
+        await Load();
+
+        polling = new();
+        pollTask = Poll(polling.Token);
+    }
+
+    private async Task Poll(CancellationToken ct)
+    {
+        try
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+
+            while (job is not null &&
+                   job.Status is not (ImportJobStatus.Completed or ImportJobStatus.Failed) &&
+                   await timer.WaitForNextTickAsync(ct))
+            {
+                await InvokeAsync(async () =>
+                {
+                    await Load();
+                    StateHasChanged();
+                });
+
+                if (Error is not null)
+                {
+                    break;
+                }
+            }
+        }
+        catch (OperationCanceledException)
+            when (ct.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async Task StopPolling()
+    {
+        polling?.Cancel();
+
+        if (pollTask is not null)
+        {
+            await pollTask;
+        }
+
+        polling?.Dispose();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await StopPolling();
+    }
+
+    private Task Load() => Run(async () =>
+    {
+        job = null;
+        summary = null;
+
+        job = await Api.GetAsync<ImportJobDto>(
+            $"api/import-jobs/{Id}",
+            Auth.AccessToken);
+
+        if (job?.Status == ImportJobStatus.Completed)
+        {
+            summary = await Api.GetAsync<ImportSummaryDto>(
+                $"api/import-jobs/{Id}/summary",
+                Auth.AccessToken);
+        }
+    });
+}

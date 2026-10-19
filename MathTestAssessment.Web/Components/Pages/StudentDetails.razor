@@ -1,0 +1,133 @@
+@page "/students/{Id:guid}"
+@attribute [Authorize(Roles = "Teacher")]
+@inherits ApiPage
+
+<PageTitle>Student details</PageTitle>
+
+<h1>Student details</h1>
+
+<RadzenLink Path="/students"
+            Text="Back to students" />
+
+<OperationStatus Busy="@(Busy && student is null)"
+                 Error="@Error" />
+
+<RadzenButton Text="Refresh"
+              Icon="refresh"
+              Click="Refresh"
+              Disabled="Busy"
+              class="rz-ml-4" />
+
+@if (student is not null)
+{
+    <RadzenCard class="rz-my-4">
+        <h2>@student.FirstName @student.LastName</h2>
+
+        <p>
+            ID: @student.ExternalStudentId
+        </p>
+
+        <RadzenLink Path="@($"/analytics?studentId={Id}")"
+                    Text="View analytics" />
+    </RadzenCard>
+
+    <h2>Student exams</h2>
+
+    <p>
+        Only exams available to your account are shown.
+    </p>
+
+    <RadzenDataGrid @ref="grid"
+                    TItem="ExamDto"
+                    Data="exams"
+                    Count="totalCount"
+                    LoadData="LoadExams"
+                    AllowPaging="true"
+                    PagerAlwaysVisible="true"
+                    ShowPagingSummary="true"
+                    PagingSummaryFormat="Page {0} of {1} ({2} records)"
+                    FirstPageTitle="First page"
+                    FirstPageAriaLabel="First page"
+                    PrevPageLabel="Previous"
+                    NextPageLabel="Next"
+                    LastPageTitle="Last page"
+                    LastPageAriaLabel="Last page"
+                    PageSize="10"
+                    IsLoading="Busy"
+                    EmptyText="No exams available for this student.">
+
+        <Columns>
+            <RadzenDataGridColumn TItem="ExamDto"
+                                  Property="ExternalExamId"
+                                  Title="Exam" />
+
+            <RadzenDataGridColumn TItem="ExamDto"
+                                  Property="CreatedAtUtc"
+                                  Title="Created (UTC)"
+                                  FormatString="{0:yyyy-MM-dd HH:mm}" />
+
+            <RadzenDataGridColumn TItem="ExamDto"
+                                  Title="Results"
+                                  Filterable="false"
+                                  Sortable="false">
+
+                <Template Context="exam">
+                    <RadzenLink Path="@($"/analytics/students/{Id}/exams/{exam.Id}")"
+                                Text="View results" />
+                </Template>
+
+            </RadzenDataGridColumn>
+        </Columns>
+
+    </RadzenDataGrid>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private StudentDto? student;
+    private List<ExamDto>? exams;
+    private RadzenDataGrid<ExamDto>? grid;
+
+    private int totalCount;
+
+    protected override Task OnParametersSetAsync()
+    {
+        return LoadStudent();
+    }
+
+    private Task LoadStudent() => Run(async () =>
+    {
+        student = null;
+        exams = null;
+        totalCount = 0;
+
+        student = await Api.GetAsync<StudentDto>(
+            $"api/students/{Id}",
+            Auth.AccessToken);
+    });
+
+    private Task LoadExams(LoadDataArgs args) => Run(async () =>
+    {
+        var pageSize = args.Top ?? 10;
+        var page = (args.Skip ?? 0) / pageSize + 1;
+
+        var result = await Api.GetAsync<PagedResponse<ExamDto>>(
+            $"api/exams/student/{Id}/paged?page={page}&pageSize={pageSize}",
+            Auth.AccessToken);
+
+        exams = result?.Items ?? [];
+        totalCount = result?.TotalCount ?? 0;
+    });
+
+    private async Task Refresh()
+    {
+        await LoadStudent();
+
+        if (grid is not null)
+        {
+            await grid.Reload();
+        }
+    }
+}

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Engines\MathTestAssessment.MathEngine\MathTestAssessment.MathEngine.csproj" />
+    <ProjectReference Include="..\..\Modules\Examinations\MathTestAssessment.Modules.Examinations\MathTestAssessment.Modules.Examinations.csproj" />
+    <ProjectReference Include="..\..\Modules\Imports\MathTestAssessment.Modules.Imports\MathTestAssessment.Modules.Imports.csproj" />
+    <ProjectReference Include="..\..\MathTestAssessment.Web\MathTestAssessment.Web.csproj" />
+  </ItemGroup>
+</Project>

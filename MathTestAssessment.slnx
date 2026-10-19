@@ -1,0 +1,31 @@
+<Solution>
+  <Folder Name="/Engines/">
+    <Project Path="Engines/MathTestAssessment.MathEngine/MathTestAssessment.MathEngine.csproj" />
+  </Folder>
+  <Folder Name="/Hosts/">
+    <Project Path="MathTestAssessment.Api/MathTestAssessment.Api.csproj" />
+    <Project Path="MathTestAssessment.Web/MathTestAssessment.Web.csproj" />
+  </Folder>
+  <Folder Name="/Modules/" />
+  <Folder Name="/Modules/Analytics/">
+    <Project Path="Modules/Analytics/MathTestAssessment.Modules.Analytics/MathTestAssessment.Modules.Analytics.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Examinations/">
+    <Project Path="Modules/Examinations/MathTestAssessment.Modules.Examinations/MathTestAssessment.Modules.Examinations.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Identity/">
+    <Project Path="Modules/Identity/MathTestAssessment.Modules.Identity/MathTestAssessment.Modules.Identity.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Imports/">
+    <Project Path="Modules/Imports/MathTestAssessment.Modules.Imports/MathTestAssessment.Modules.Imports.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Students/">
+    <Project Path="Modules/Students/MathTestAssessment.Modules.Students/MathTestAssessment.Modules.Students.csproj" />
+  </Folder>
+  <Folder Name="/Shared/">
+    <Project Path="Shared/MathTestAssessment.BackgroundJobs/MathTestAssessment.BackgroundJobs.csproj" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="Tests/MathTestAssessment.UnitTests/MathTestAssessment.UnitTests.csproj" />
+  </Folder>
+</Solution>

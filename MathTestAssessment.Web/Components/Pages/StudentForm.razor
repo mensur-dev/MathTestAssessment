@@ -1,0 +1,148 @@
+@page "/students/create"
+@page "/students/{Id:guid}/edit"
+@attribute [Authorize(Roles = "Teacher")]
+@inherits ApiPage
+
+<PageTitle>@(Id.HasValue ? "Edit student" : "Create student")</PageTitle>
+
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">STUDENT DIRECTORY</p>
+
+        <h1>
+            @(Id.HasValue ? "Edit student" : "Create student")
+        </h1>
+
+        <p>
+            Enter the student's ID and profile details.
+            An administrator can create their login account separately.
+        </p>
+    </div>
+</div>
+
+<OperationStatus Busy="Busy" Error="@Error" />
+
+<RadzenCard class="account-form-card">
+    <RadzenTemplateForm TItem="CreateStudentDto"
+                        Data="model"
+                        Submit="Save">
+
+        <RadzenStack Gap="1rem">
+            <RadzenTextBox Name="Code"
+                           @bind-Value="model.ExternalStudentId"
+                           Placeholder="ID"
+                           aria-label="ID" />
+
+            <RadzenRequiredValidator Component="Code"
+                                     Text="ID is required." />
+
+            <RadzenLengthValidator Component="Code"
+                                   Max="100"
+                                   Text="ID cannot exceed 100 characters." />
+
+            <RadzenTextBox Name="FirstName"
+                           @bind-Value="model.FirstName"
+                           Placeholder="First name"
+                           aria-label="First name" />
+
+            <RadzenRequiredValidator Component="FirstName"
+                                     Text="First name is required." />
+
+            <RadzenLengthValidator Component="FirstName"
+                                   Max="100"
+                                   Text="First name cannot exceed 100 characters." />
+
+            <RadzenTextBox Name="LastName"
+                           @bind-Value="model.LastName"
+                           Placeholder="Last name"
+                           aria-label="Last name" />
+
+            <RadzenRequiredValidator Component="LastName"
+                                     Text="Last name is required." />
+
+            <RadzenLengthValidator Component="LastName"
+                                   Max="100"
+                                   Text="Last name cannot exceed 100 characters." />
+
+            <RadzenStack Orientation="Orientation.Horizontal"
+                         Gap="0.75rem">
+
+                <RadzenButton Text="@(Id.HasValue ? "Save changes" : "Create student")"
+                              Icon="save"
+                              ButtonType="ButtonType.Submit"
+                              Disabled="@(Busy || !ready)" />
+
+                <RadzenButton Text="Cancel"
+                              Icon="close"
+                              ButtonStyle="ButtonStyle.Light"
+                              Click="Back"
+                              Disabled="Busy" />
+
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenTemplateForm>
+</RadzenCard>
+
+@code {
+    [Parameter]
+    public Guid? Id { get; set; }
+
+    private CreateStudentDto model = new();
+    private bool ready;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        ready = false;
+        model = new();
+
+        if (Id is null)
+        {
+            ready = true;
+            return;
+        }
+
+        await Run(async () =>
+        {
+            var student = await Api.GetAsync<StudentDto>(
+                $"api/students/{Id}",
+                Auth.AccessToken);
+
+            if (student is null)
+            {
+                return;
+            }
+
+            model = new()
+            {
+                ExternalStudentId = student.ExternalStudentId,
+                FirstName = student.FirstName,
+                LastName = student.LastName
+            };
+
+            ready = true;
+        });
+    }
+
+    private Task Save() => Run(async () =>
+    {
+        if (!ready)
+        {
+            return;
+        }
+
+        await Api.SendAsync(
+            Id.HasValue ? HttpMethod.Put : HttpMethod.Post,
+            Id.HasValue ? $"api/students/{Id}" : "api/students",
+            model,
+            Auth.AccessToken);
+
+        Saved(Id.HasValue ? "Student updated." : "Student created.");
+
+        Back();
+    });
+
+    private void Back()
+    {
+        Navigation.NavigateTo("/students");
+    }
+}

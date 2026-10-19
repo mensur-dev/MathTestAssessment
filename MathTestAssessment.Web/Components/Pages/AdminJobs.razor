@@ -1,0 +1,203 @@
+@page "/admin/jobs"
+@attribute [Authorize(Roles = "Admin")]
+@inherits ApiPage
+@implements IAsyncDisposable
+@inject DialogService Dialogs
+
+<PageTitle>Background jobs</PageTitle>
+
+<h1>Background jobs</h1>
+
+<p>
+    Restart failed imports after correcting the cause.
+    Restarting resets the attempt counter and reuses the original XML and teacher.
+</p>
+
+<p class="muted">
+    <RadzenIcon Icon="sync" />
+    Statuses update automatically every 20 seconds.
+</p>
+
+<OperationStatus Error="@Error" />
+
+<RadzenButton Text="Refresh now"
+              Icon="refresh"
+              ButtonStyle="ButtonStyle.Light"
+              Click="Load"
+              Disabled="Busy" />
+
+<RadzenDataGrid @ref="grid"
+                TItem="ImportJobDto"
+                Data="jobs"
+                Count="totalCount"
+                LoadData="LoadJobs"
+                AllowPaging="true"
+                PagerAlwaysVisible="true"
+                ShowPagingSummary="true"
+                PagingSummaryFormat="Page {0} of {1} ({2} records)"
+                FirstPageTitle="First page"
+                FirstPageAriaLabel="First page"
+                PrevPageLabel="Previous"
+                NextPageLabel="Next"
+                LastPageTitle="Last page"
+                LastPageAriaLabel="Last page"
+                PageSize="25"
+                IsLoading="Busy"
+                class="rz-my-4"
+                EmptyText="No jobs found.">
+
+    <Columns>
+        <RadzenDataGridColumn TItem="ImportJobDto"
+                              Property="Id"
+                              Title="Job ID" />
+
+        <RadzenDataGridColumn TItem="ImportJobDto"
+                              Property="Status"
+                              Title="Status" />
+
+        <RadzenDataGridColumn TItem="ImportJobDto"
+                              Property="AttemptCount"
+                              Title="Attempts" />
+
+        <RadzenDataGridColumn TItem="ImportJobDto"
+                              Property="CreatedAtUtc"
+                              Title="Created (UTC)" />
+
+        <RadzenDataGridColumn TItem="ImportJobDto"
+                              Title="Last error">
+
+            <Template Context="job">
+                <span class="grid-message"
+                      title="@job.ErrorMessage">
+                    @(string.IsNullOrWhiteSpace(job.ErrorMessage)
+                        ? "—"
+                        : job.ErrorMessage)
+                </span>
+            </Template>
+
+        </RadzenDataGridColumn>
+
+        <RadzenDataGridColumn TItem="ImportJobDto"
+                              Title="Action">
+
+            <Template Context="job">
+                <RadzenButton Text="Restart job"
+                              Icon="replay"
+                              ButtonStyle="ButtonStyle.Primary"
+                              Variant="Variant.Flat"
+                              class="grid-action-button"
+                              Disabled="@(Busy || job.Status != ImportJobStatus.Failed)"
+                              Click="@(() => Restart(job))" />
+            </Template>
+
+        </RadzenDataGridColumn>
+    </Columns>
+
+</RadzenDataGrid>
+
+@code {
+    private List<ImportJobDto>? jobs;
+    private RadzenDataGrid<ImportJobDto>? grid;
+    private int totalCount;
+
+    private CancellationTokenSource? pollingCancellation;
+    private Task? pollingTask;
+
+    protected override async Task OnInitializedAsync()
+    {
+        pollingCancellation = new CancellationTokenSource();
+        pollingTask = PollAsync(pollingCancellation.Token);
+    }
+
+    private Task LoadJobs(LoadDataArgs args) => Run(async () =>
+    {
+        var pageSize = args.Top ?? 25;
+        var page = (args.Skip ?? 0) / pageSize + 1;
+
+        var result = await Api.GetAsync<PagedResponse<ImportJobDto>>(
+            $"api/admin/import-jobs?page={page}&pageSize={pageSize}",
+            Auth.AccessToken);
+
+        jobs = result?.Items ?? [];
+        totalCount = result?.TotalCount ?? 0;
+    });
+
+    private async Task Load()
+    {
+        if (grid is not null)
+        {
+            await grid.Reload();
+        }
+    }
+
+    private async Task Restart(ImportJobDto job)
+    {
+        if (await Dialogs.Confirm(
+            "Queue this failed import again using its original XML?",
+            "Restart job") != true)
+        {
+            return;
+        }
+
+        await Run(async () =>
+        {
+            await Api.PostAsync(
+                $"api/admin/import-jobs/{job.Id}/restart",
+                Auth.AccessToken!);
+
+            Saved("Import queued again.");
+        });
+
+        if (Error is null)
+        {
+            await Load();
+        }
+    }
+
+    private async Task PollAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(20));
+
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                await InvokeAsync(async () =>
+                {
+                    if (!Busy)
+                    {
+                        await Load();
+                        StateHasChanged();
+                    }
+                });
+            }
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (pollingCancellation is null)
+        {
+            return;
+        }
+
+        await pollingCancellation.CancelAsync();
+
+        if (pollingTask is not null)
+        {
+            try
+            {
+                await pollingTask;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        pollingCancellation.Dispose();
+    }
+}

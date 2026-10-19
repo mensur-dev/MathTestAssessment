@@ -1,0 +1,134 @@
+@page "/exams/{Id:guid}"
+@page "/analytics/students/{StudentId:guid}/exams/{Id:guid}"
+@attribute [Authorize(Roles = "Teacher,Student")]
+@inherits ApiPage
+
+<PageTitle>Exam results</PageTitle>
+
+<RadzenLink Path="/exams"
+            Text="← Back to exams" />
+
+<OperationStatus Busy="Busy" Error="@Error" />
+
+@if (exam is not null && result is not null)
+{
+    <div class="page-heading">
+        <div>
+            <p class="eyebrow">EXAM RESULTS</p>
+
+            <h1>@exam.ExternalExamId</h1>
+
+            <p>
+                @exam.CreatedAtUtc.ToString("dd MMM yyyy · HH:mm") UTC
+                · @result.TotalTasks tasks in this exam
+            </p>
+        </div>
+
+        <RadzenButton Text="Refresh"
+                      Click="Load"
+                      Disabled="Busy"
+                      ButtonStyle="ButtonStyle.Light"
+                      Icon="refresh" />
+    </div>
+
+    <div class="metrics-grid">
+        <div class="metric">
+            <span>Score</span>
+
+            <strong>
+                @(result.CorrectTasks + result.IncorrectTasks == 0
+                    ? "—"
+                    : result.ScorePercentage.ToString("0.##") + "%")
+            </strong>
+        </div>
+
+        <div class="metric">
+            <span>Correct answers</span>
+
+            <strong>
+                @result.CorrectTasks
+                <small>
+                    / @(result.CorrectTasks + result.IncorrectTasks) evaluated
+                </small>
+            </strong>
+        </div>
+
+        <div class="metric">
+            <span>Review</span>
+
+            <strong>
+                @result.IncorrectTasks
+                <small>incorrect</small>
+            </strong>
+
+            <small>
+                @result.UnevaluatedTasks not evaluated
+            </small>
+        </div>
+    </div>
+
+    <p class="muted">
+        Scores exclude unevaluated tasks.
+        Answers are compared at 18 decimal places,
+        rounded to even, matching storage precision.
+    </p>
+
+    <div class="page-actions">
+        <RadzenButton Text="@($"All ({result.TotalTasks})")"
+                      ButtonStyle="@(filter == "all" ? ButtonStyle.Primary : ButtonStyle.Light)"
+                      Click="@(() => filter = "all")" />
+
+        <RadzenButton Text="@($"Incorrect ({result.IncorrectTasks})")"
+                      ButtonStyle="@(filter == "incorrect" ? ButtonStyle.Primary : ButtonStyle.Light)"
+                      Click="@(() => filter = "incorrect")" />
+
+        <RadzenButton Text="@($"Not evaluated ({result.UnevaluatedTasks})")"
+                      ButtonStyle="@(filter == "pending" ? ButtonStyle.Primary : ButtonStyle.Light)"
+                      Click="@(() => filter = "pending")" />
+    </div>
+
+    <ExamTaskTable Exam="exam"
+                   Filter="@filter" />
+}
+else if (!Busy)
+{
+    <RadzenButton Text="Retry"
+                  Click="Load" />
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    [Parameter]
+    public Guid? StudentId { get; set; }
+
+    private ExamDto? exam;
+    private ExamResultDto? result;
+
+    private string filter = "all";
+
+    protected override Task OnParametersSetAsync()
+    {
+        return Load();
+    }
+
+    private Task Load() => Run(async () =>
+    {
+        exam = null;
+        result = null;
+        filter = "all";
+
+        var endpoint = StudentId.HasValue
+            ? $"api/analytics/students/{StudentId}/exams/{Id}"
+            : $"api/exams/{Id}";
+
+        exam = await Api.GetAsync<ExamDto>(
+            endpoint,
+            Auth.AccessToken);
+
+        result = await Api.GetAsync<ExamResultDto>(
+            $"api/exams/{Id}/result",
+            Auth.AccessToken);
+    });
+}

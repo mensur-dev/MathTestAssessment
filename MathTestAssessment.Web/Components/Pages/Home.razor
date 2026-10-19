@@ -1,0 +1,174 @@
+@page "/"
+@attribute [Authorize(Roles = "Admin,Teacher,Student")]
+@inherits ApiPage
+
+<PageTitle>Dashboard - MathTestAssessment</PageTitle>
+
+<AuthorizeView Roles="Admin">
+    <Authorized>
+        <h1>Administration</h1>
+
+        <p>
+            Manage accounts and keep exam imports running.
+        </p>
+
+        <div class="metrics-grid">
+            <RadzenCard>
+                <h2>Users</h2>
+
+                <p>
+                    Register teacher and student accounts.
+                </p>
+
+                <RadzenLink Path="/users"
+                            Text="Manage users" />
+            </RadzenCard>
+
+            <RadzenCard>
+                <h2>Background jobs</h2>
+
+                <p>
+                    Review processing status and restart failed imports.
+                </p>
+
+                <RadzenLink Path="/admin/jobs"
+                            Text="Manage jobs" />
+            </RadzenCard>
+        </div>
+    </Authorized>
+</AuthorizeView>
+
+<AuthorizeView Roles="Teacher,Student">
+    <Authorized Context="learningSession">
+        <div class="page-heading">
+            <div>
+                <p class="eyebrow">
+                    @(isTeacher ? "TEACHER WORKSPACE" : "MY LEARNING")
+                </p>
+
+                <h1>
+                    @(isTeacher ? "Exam overview" : "My exams")
+                </h1>
+
+                <p>
+                    @(isTeacher
+                        ? "Results from your imported exams, grouped by exam."
+                        : "Your results and answers, one exam at a time.")
+                </p>
+            </div>
+
+            <RadzenButton Text="Refresh"
+                          Icon="refresh"
+                          Click="Load"
+                          Disabled="Busy"
+                          ButtonStyle="ButtonStyle.Light" />
+        </div>
+
+        <OperationStatus Busy="Busy" Error="@Error" />
+
+        @if (loaded)
+        {
+            <div class="metrics-grid">
+                <div class="metric">
+                    <span>
+                        @(isTeacher ? "Available exams" : "My exams")
+                    </span>
+
+                    <strong>@dashboard.TotalExams</strong>
+                </div>
+
+                <div class="metric">
+                    <span>
+                        Total tasks across @dashboard.TotalExams exams
+                    </span>
+
+                    <strong>@dashboard.TotalTasks</strong>
+
+                    <small>
+                        See each exam below for its tasks.
+                    </small>
+                </div>
+
+                @if (isTeacher)
+                {
+                    <div class="metric">
+                        <span>Students with exams</span>
+
+                        <strong>@dashboard.DistinctStudents</strong>
+                    </div>
+                }
+                else
+                {
+                    <div class="metric">
+                        <span>Correct answers</span>
+
+                        <strong>
+                            @dashboard.CorrectTasks
+                            <small> / @dashboard.TotalTasks</small>
+                        </strong>
+                    </div>
+                }
+            </div>
+
+            @if (isTeacher)
+            {
+                <div class="page-actions">
+                    <RadzenLink Path="/students"
+                                Text="Manage students" />
+
+                    <RadzenLink Path="/imports"
+                                Text="Import XML" />
+                </div>
+            }
+
+            <h2>
+                @(isTeacher ? "Recent exams" : "My recent exams")
+            </h2>
+
+            @if (dashboard.RecentExams.Count == 0)
+            {
+                <RadzenCard>
+                    No exams available yet.
+                </RadzenCard>
+            }
+            else
+            {
+                <ExamCards Exams="dashboard.RecentExams" />
+
+                <RadzenLink Path="/analytics"
+                            Text="View full analytics"
+                            class="rz-my-4" />
+            }
+        }
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    private ExamDashboardResponse dashboard = new();
+
+    private bool loaded, isTeacher;
+
+    protected override Task OnInitializedAsync()
+    {
+        return Load();
+    }
+
+    private Task Load() => Run(async () =>
+    {
+        var user = (await Auth.GetAuthenticationStateAsync()).User;
+
+        if (user.IsInRole("Admin"))
+        {
+            return;
+        }
+
+        isTeacher = user.IsInRole("Teacher");
+        loaded = false;
+
+        dashboard = await Api.GetAsync<ExamDashboardResponse>(
+            "api/exams/dashboard",
+            Auth.AccessToken) ?? new();
+
+        loaded = true;
+    });
+}

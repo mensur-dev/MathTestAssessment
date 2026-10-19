@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Five exams and 25 tasks for Student Code 12345. -->
+<Teacher ID="11111">
+  <Students>
+    <Student ID="12345">
+      <Exam Id="4">
+        <Task id="1">2+3 = 5</Task>
+        <Task id="2">10-4 = 6</Task>
+        <Task id="3">3*4 = 12</Task>
+        <Task id="4">20/4 = 5</Task>
+        <Task id="5">2+3*4 = 15</Task>
+      </Exam>
+      <Exam Id="5">
+        <Task id="1">(2+3)*4 = 20</Task>
+        <Task id="2">18/3+2 = 8</Task>
+        <Task id="3">7-2*3 = 1</Task>
+        <Task id="4">12+8/4 = 14</Task>
+        <Task id="5">1.5+2.5 = 4</Task>
+      </Exam>
+      <Exam Id="6">
+        <Task id="1">9/3*2 = 6</Task>
+        <Task id="2">5*5-10 = 15</Task>
+        <Task id="3">(10-4)/2 = 3</Task>
+        <Task id="4">8+2*5 = 50</Task>
+        <Task id="5">100/10-3 = 7</Task>
+      </Exam>
+      <Exam Id="7">
+        <Task id="1">15-3*4 = 3</Task>
+        <Task id="2">(8+4)/3 = 4</Task>
+        <Task id="3">2.5*4 = 10</Task>
+        <Task id="4">30/5+6 = 11</Task>
+        <Task id="5">7*3-2 = 19</Task>
+      </Exam>
+      <Exam Id="8">
+        <Task id="1">4*(6-2) = 16</Task>
+        <Task id="2">24/6+3*2 = 10</Task>
+        <Task id="3">18-(4+5) = 9</Task>
+        <Task id="4">3.5+1.5*2 = 10</Task>
+        <Task id="5">(9+3)/4 = 3</Task>
+      </Exam>
+    </Student>
+  </Students>
+</Teacher>

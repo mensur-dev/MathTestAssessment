@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Create these Codes in the application or replace them before upload. -->
+<Teacher ID="11111">
+  <Students>
+    <Student ID="12345">
+      <Exam Id="2">
+        <Task id="1">12+8/4 = 14</Task>
+        <Task id="2">(10-4)/2 = 3</Task>
+        <Task id="3">5*5-10 = 15</Task>
+        <Task id="4">1.5+2.5 = 4</Task>
+        <Task id="5">9/3*2 = 6</Task>
+      </Exam>
+      <Exam Id="3">
+        <Task id="1">15-3*4 = 3</Task>
+        <Task id="2">(8+4)/3 = 4</Task>
+        <Task id="3">2.5*4 = 10</Task>
+        <Task id="4">30/5+6 = 11</Task>
+        <Task id="5">7*3-2 = 19</Task>
+      </Exam>
+    </Student>
+    <Student ID="54321">
+      <Exam Id="1">
+        <Task id="1">2+3/6-4 = -1.5</Task>
+        <Task id="2">6*2+3-4 = 11</Task>
+        <Task id="3">(2+3)*4 = 14</Task>
+        <Task id="4">18/3+2 = 8</Task>
+        <Task id="5">7-2*3 = 1</Task>
+      </Exam>
+      <Exam Id="2">
+        <Task id="1">4*(6-2) = 16</Task>
+        <Task id="2">24/6+3*2 = 10</Task>
+        <Task id="3">18-(4+5) = 9</Task>
+        <Task id="4">3.5+1.5*2 = 6.5</Task>
+        <Task id="5">(9+3)/4 = 3</Task>
+      </Exam>
+    </Student>
+  </Students>
+</Teacher>

@@ -1,0 +1,248 @@
+@page "/imports"
+@attribute [Authorize(Roles = "Teacher")]
+@inherits ApiPage
+@implements IAsyncDisposable
+
+<PageTitle>XML imports</PageTitle>
+
+<h1>XML imports</h1>
+
+<p>
+    Upload an XML exam file, up to 10 MB.
+    Processing runs in the background.
+</p>
+
+<OperationStatus Busy="@(Busy && file is not null)"
+                 Error="@Error" />
+
+<InputFile @key="fileInputKey"
+           OnChange="SelectFile"
+           accept=".xml,application/xml,text/xml"
+           disabled="@Busy"
+           aria-label="Select XML file" />
+
+@if (file is not null)
+{
+    <p>@file.Name (@file.Size bytes)</p>
+}
+
+@if (validation is not null)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Warning">
+        @validation
+    </RadzenAlert>
+}
+
+<RadzenButton Text="Upload XML"
+              Icon="upload_file"
+              Click="Upload"
+              Disabled="@(Busy || file is null)" />
+
+<div class="page-heading">
+    <h2>My imports</h2>
+
+    <RadzenButton Text="Refresh"
+                  Icon="refresh"
+                  ButtonStyle="ButtonStyle.Light"
+                  Click="Refresh"
+                  Disabled="Busy" />
+</div>
+
+<p class="muted">
+    Your imports and processing results.
+    Statuses update automatically every 20 seconds.
+</p>
+
+<RadzenDataGrid @ref="grid"
+                TItem="ImportJobDto"
+                Data="jobs"
+                Count="totalCount"
+                LoadData="LoadJobs"
+                AllowPaging="true"
+                PagerAlwaysVisible="true"
+                ShowPagingSummary="true"
+                PagingSummaryFormat="Page {0} of {1} ({2} records)"
+                FirstPageTitle="First page"
+                FirstPageAriaLabel="First page"
+                PrevPageLabel="Previous"
+                NextPageLabel="Next"
+                LastPageTitle="Last page"
+                LastPageAriaLabel="Last page"
+                PageSize="10"
+                IsLoading="Busy"
+                EmptyText="You have not uploaded any XML files yet.">
+
+    <Columns>
+        <RadzenDataGridColumn TItem="ImportJobDto"
+                              Title="File">
+
+            <Template Context="job">
+                @(job.FileName ?? "XML import (original filename unavailable)")
+            </Template>
+
+        </RadzenDataGridColumn>
+
+        <RadzenDataGridColumn TItem="ImportJobDto"
+                              Property="CreatedAtUtc"
+                              Title="Uploaded (UTC)"
+                              FormatString="{0:yyyy-MM-dd HH:mm}" />
+
+        <RadzenDataGridColumn TItem="ImportJobDto"
+                              Property="Status"
+                              Title="Status" />
+
+        <RadzenDataGridColumn TItem="ImportJobDto"
+                              Title="Result">
+
+            <Template Context="job">
+                <span class="grid-message">
+                    @(job.Status == ImportJobStatus.Completed
+                        ? "Exams processed successfully."
+                        : job.ErrorMessage ?? "Waiting for processing to finish.")
+                </span>
+            </Template>
+
+        </RadzenDataGridColumn>
+
+        <RadzenDataGridColumn TItem="ImportJobDto"
+                              Title="Details">
+
+            <Template Context="job">
+                <RadzenLink Path="@($"/imports/{job.Id}")"
+                            Text="View details" />
+            </Template>
+
+        </RadzenDataGridColumn>
+    </Columns>
+
+</RadzenDataGrid>
+
+@code {
+    private IBrowserFile? file;
+    private string? validation;
+
+    private List<ImportJobDto>? jobs;
+    private RadzenDataGrid<ImportJobDto>? grid;
+
+    private int totalCount;
+
+    private readonly CancellationTokenSource pollingCancellation = new();
+    private Task? pollingTask;
+
+    private int fileInputKey;
+
+    private void SelectFile(InputFileChangeEventArgs args)
+    {
+        validation = null;
+        file = null;
+
+        if (!Path.GetExtension(args.File.Name)
+            .Equals(".xml", StringComparison.OrdinalIgnoreCase))
+        {
+            validation = $"File '{args.File.Name}' cannot be uploaded. Only XML (.xml) files are accepted.";
+
+            fileInputKey++;
+            return;
+        }
+
+        if (args.File.Size == 0)
+        {
+            validation = $"File '{args.File.Name}' is empty. Select an XML file that contains exam data.";
+
+            fileInputKey++;
+            return;
+        }
+
+        if (args.File.Size > 10 * 1024 * 1024)
+        {
+            validation = $"File '{args.File.Name}' exceeds the 10 MB upload limit.";
+
+            fileInputKey++;
+            return;
+        }
+
+        file = args.File;
+    }
+
+    private Task Upload() => Run(async () =>
+    {
+        if (file is null)
+        {
+            return;
+        }
+
+        await using var stream = file.OpenReadStream(10 * 1024 * 1024);
+
+        var created = await Api.UploadAsync(
+            stream,
+            file.Name,
+            Auth.AccessToken);
+
+        if (created is not null)
+        {
+            file = null;
+            fileInputKey++;
+
+            Navigation.NavigateTo($"/imports/{created.Id}");
+        }
+    });
+
+    protected override void OnInitialized()
+    {
+        pollingTask = PollAsync(pollingCancellation.Token);
+    }
+
+    private Task LoadJobs(LoadDataArgs args) => Run(async () =>
+    {
+        var pageSize = args.Top ?? 10;
+        var page = (args.Skip ?? 0) / pageSize + 1;
+
+        var result = await Api.GetAsync<PagedResponse<ImportJobDto>>(
+            $"api/import-jobs?page={page}&pageSize={pageSize}",
+            Auth.AccessToken);
+
+        jobs = result?.Items ?? [];
+        totalCount = result?.TotalCount ?? 0;
+    });
+
+    private async Task Refresh()
+    {
+        if (!Busy && grid is not null)
+        {
+            await grid.Reload();
+        }
+    }
+
+    private async Task PollAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(20));
+
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                await InvokeAsync(async () =>
+                {
+                    await Refresh();
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await pollingCancellation.CancelAsync();
+
+        if (pollingTask is not null)
+        {
+            await pollingTask;
+        }
+
+        pollingCancellation.Dispose();
+    }
+}

@@ -1,0 +1,129 @@
+@page "/exams"
+@attribute [Authorize(Roles = "Teacher,Student")]
+@inherits ApiPage
+
+<PageTitle>Exams</PageTitle>
+
+<h1>Exams</h1>
+
+<p>
+    Exams available to your account, with automatically evaluated results.
+</p>
+
+<OperationStatus Error="@Error" />
+
+<RadzenButton Text="Refresh"
+              Icon="refresh"
+              Click="RefreshGrid"
+              Disabled="Busy" />
+
+<RadzenDataGrid @ref="grid"
+                TItem="ExamDto"
+                Data="exams"
+                Count="totalCount"
+                LoadData="LoadExams"
+                AllowPaging="true"
+                PagerAlwaysVisible="true"
+                ShowPagingSummary="true"
+                PagingSummaryFormat="Page {0} of {1} ({2} records)"
+                FirstPageTitle="First page"
+                FirstPageAriaLabel="First page"
+                PrevPageLabel="Previous"
+                NextPageLabel="Next"
+                LastPageTitle="Last page"
+                LastPageAriaLabel="Last page"
+                PageSize="10"
+                IsLoading="Busy"
+                EmptyText="No exams found."
+                class="rz-my-4">
+
+    <Columns>
+        <RadzenDataGridColumn TItem="ExamDto"
+                              Property="ExternalExamId"
+                              Title="Exam" />
+
+        @if (isTeacher)
+        {
+            <RadzenDataGridColumn TItem="ExamDto"
+                                  Property="StudentName"
+                                  Title="Student" />
+        }
+
+        <RadzenDataGridColumn TItem="ExamDto"
+                              Title="Tasks in this exam"
+                              Sortable="false"
+                              Filterable="false">
+
+            <Template Context="exam">
+                @exam.Tasks.Count
+            </Template>
+
+        </RadzenDataGridColumn>
+
+        <RadzenDataGridColumn TItem="ExamDto"
+                              Title="Score"
+                              Sortable="false"
+                              Filterable="false">
+
+            <Template Context="exam">
+                @(ExamPresentation.Correct(exam) + ExamPresentation.Incorrect(exam) == 0
+                    ? "—"
+                    : ExamPresentation.Score(exam).ToString("0.##") + "%")
+            </Template>
+
+        </RadzenDataGridColumn>
+
+        <RadzenDataGridColumn TItem="ExamDto"
+                              Property="CreatedAtUtc"
+                              Title="Created (UTC)"
+                              FormatString="{0:yyyy-MM-dd HH:mm}" />
+
+        <RadzenDataGridColumn TItem="ExamDto"
+                              Title="Details"
+                              Filterable="false"
+                              Sortable="false">
+
+            <Template Context="exam">
+                <RadzenLink Path="@($"/exams/{exam.Id}")"
+                            Text="View results" />
+            </Template>
+
+        </RadzenDataGridColumn>
+    </Columns>
+
+</RadzenDataGrid>
+
+@code {
+    private List<ExamDto>? exams;
+    private RadzenDataGrid<ExamDto>? grid;
+
+    private int totalCount;
+    private bool isTeacher;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isTeacher = (await Auth.GetAuthenticationStateAsync())
+            .User.IsInRole("Teacher");
+    }
+
+    private Task LoadExams(LoadDataArgs args) => Run(async () =>
+    {
+        var pageSize = args.Top ?? 10;
+        var page = (args.Skip ?? 0) / pageSize + 1;
+
+        var result = await Api.GetAsync<PagedResponse<ExamDto>>(
+            $"api/exams/paged?page={page}&pageSize={pageSize}",
+            Auth.AccessToken);
+
+        exams = result?.Items ?? [];
+        totalCount = result?.TotalCount ?? 0;
+    });
+
+    private async Task RefreshGrid()
+    {
+        if (grid is not null)
+        {
+            await grid.Reload();
+        }
+    }
+}

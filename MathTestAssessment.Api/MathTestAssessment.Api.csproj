@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>18c1ed8d-8231-4b4a-980a-64b8d75c5001</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Swashbuckle.AspNetCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+
+    <ProjectReference Include="..\Shared\MathTestAssessment.BackgroundJobs\MathTestAssessment.BackgroundJobs.csproj" />
+    <ProjectReference Include="..\Modules\Identity\MathTestAssessment.Modules.Identity\MathTestAssessment.Modules.Identity.csproj" />
+    <ProjectReference Include="..\Modules\Students\MathTestAssessment.Modules.Students\MathTestAssessment.Modules.Students.csproj" />
+    <ProjectReference Include="..\Modules\Examinations\MathTestAssessment.Modules.Examinations\MathTestAssessment.Modules.Examinations.csproj" />
+    <ProjectReference Include="..\Modules\Imports\MathTestAssessment.Modules.Imports\MathTestAssessment.Modules.Imports.csproj" />
+    <ProjectReference Include="..\Modules\Analytics\MathTestAssessment.Modules.Analytics\MathTestAssessment.Modules.Analytics.csproj" />
+  </ItemGroup>
+
+</Project>
+

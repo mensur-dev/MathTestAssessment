@@ -1,0 +1,68 @@
+<div class="task-table-scroll">
+    <table class="task-table">
+        <caption>
+            Tasks for exam @Exam.ExternalExamId
+        </caption>
+
+        <thead>
+            <tr>
+                <th scope="col">Task</th>
+                <th scope="col">Calculation</th>
+                <th scope="col">Your answer</th>
+                <th scope="col">Expected</th>
+                <th scope="col">Result</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            @foreach (var task in ExamPresentation.OrderedTasks(Exam)
+                .Where(t => Filter == "all" || (Filter == "incorrect" ? t.IsCorrect == false : t.IsCorrect is null)))
+            {
+                <tr @key="task.Id">
+                    <th scope="row">
+                        #@task.ExternalTaskId
+                    </th>
+
+                    <td>
+                        <code class="math-expression">
+                            @task.Expression
+                        </code>
+                    </td>
+
+                    <td class="numeric-answer">
+                        @ExamPresentation.Number(task.SubmittedAnswer)
+                    </td>
+
+                    <td class="numeric-answer">
+                        @ExamPresentation.Number(task.CorrectAnswer)
+                    </td>
+
+                    <td>
+                        <span class="result-pill @(task.IsCorrect == true ? "correct" : task.IsCorrect == false ? "incorrect" : "pending")">
+                            @(task.IsCorrect == true
+                                ? "✓ Correct"
+                                : task.IsCorrect == false
+                                    ? "✕ Incorrect"
+                                    : "— Not evaluated")
+                        </span>
+
+                        @if (task.IsCorrect is null)
+                        {
+                            <small class="task-note">
+                                @ExamPresentation.Error(task.EvaluationErrorCode)
+                            </small>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public ExamDto Exam { get; set; } = default!;
+
+    [Parameter]
+    public string Filter { get; set; } = "all";
+}

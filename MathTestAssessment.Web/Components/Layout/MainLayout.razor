@@ -1,0 +1,139 @@
+@inherits LayoutComponentBase
+@inject MathTestAssessment.Web.Services.AuthService AuthService
+@inject NavigationManager Navigation
+@inject NotificationService Notifications
+
+<AuthorizeView>
+    <Authorized Context="layoutSession">
+        @if (AuthService.MustChangePassword)
+        {
+            <main class="password-change-layout">
+                <div class="password-change-brand">
+                    <RadzenIcon Icon="school" />
+                    <span>MathTestAssessment</span>
+                </div>
+
+                @Body
+            </main>
+        }
+        else
+        {
+            <RadzenLayout class="exam-layout">
+                <RadzenHeader class="exam-header">
+                    <RadzenStack Orientation="Orientation.Horizontal"
+                                 AlignItems="AlignItems.Center"
+                                 Gap="1rem">
+
+                        <RadzenSidebarToggle Click="@ToggleSidebar" />
+
+                        <RadzenText TextStyle="TextStyle.H5"
+                                    class="exam-brand">
+                            MathTestAssessment
+                        </RadzenText>
+                    </RadzenStack>
+
+                    <RadzenStack Orientation="Orientation.Horizontal"
+                                 AlignItems="AlignItems.Center"
+                                 Gap="1rem">
+
+                        <RadzenIcon Icon="account_circle"
+                                    Style="font-size: 28px;" />
+
+                        <RadzenText TextStyle="TextStyle.Body1">
+                            <AuthorizeView>
+                                <Authorized Context="session">
+                                    @(session.User.FindFirst(
+                                        System.Security.Claims.ClaimTypes.Email)?.Value
+                                        ?? "Signed in")
+                                </Authorized>
+
+                                <NotAuthorized>
+                                    Guest
+                                </NotAuthorized>
+                            </AuthorizeView>
+                        </RadzenText>
+
+                        <AuthorizeView>
+                            <Authorized>
+                                <RadzenButton Text="Logout"
+                                              Icon="logout"
+                                              ButtonStyle="ButtonStyle.Light"
+                                              Variant="Variant.Flat"
+                                              class="header-action-button logout-button"
+                                              Click="@HandleLogout" />
+                            </Authorized>
+                        </AuthorizeView>
+                    </RadzenStack>
+                </RadzenHeader>
+
+                <RadzenSidebar @bind-Expanded="_sidebarExpanded"
+                               class="exam-sidebar">
+
+                    <div class="exam-sidebar-title">
+                        MATH TEST ASSESSMENT
+                    </div>
+
+                    <NavMenu />
+                </RadzenSidebar>
+
+                <RadzenBody class="exam-body">
+                    <div class="exam-content">
+                        @Body
+                    </div>
+                </RadzenBody>
+            </RadzenLayout>
+        }
+    </Authorized>
+
+    <NotAuthorized>
+        @if (string.Equals(
+            Navigation.ToBaseRelativePath(Navigation.Uri)
+                .Split('?', '#')[0]
+                .TrimEnd('/'),
+            "login",
+            StringComparison.OrdinalIgnoreCase))
+        {
+            <main>
+                @Body
+            </main>
+        }
+        else
+        {
+            <RedirectToLogin />
+        }
+    </NotAuthorized>
+</AuthorizeView>
+
+<RadzenDialog />
+<RadzenNotification />
+<RadzenContextMenu />
+<RadzenTooltip />
+
+@code {
+    private bool _sidebarExpanded = true;
+
+    private void ToggleSidebar()
+    {
+        _sidebarExpanded = !_sidebarExpanded;
+    }
+
+    private async Task HandleLogout()
+    {
+        try
+        {
+            await AuthService.LogoutAsync();
+        }
+        catch (Exception ex)
+            when (ex is HttpRequestException or TaskCanceledException)
+        {
+            Notifications.Notify(
+                NotificationSeverity.Warning,
+                "Signed out locally",
+                "The API could not confirm token revocation.");
+        }
+        finally
+        {
+            Navigation.NavigateTo("/login");
+        }
+    }
+}

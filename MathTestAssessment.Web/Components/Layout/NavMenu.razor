@@ -1,0 +1,64 @@
+<AuthorizeView Context="session">
+    <Authorized>
+        <RadzenPanelMenu class="exam-nav">
+            @if (MathTestAssessment.Web.Services.AuthServiceAccessor.RequiresPasswordChange(session.User))
+            {
+                <RadzenPanelMenuItem Text="Change password"
+                                     Icon="password"
+                                     Path="/change-password" />
+            }
+            else
+            {
+                <RadzenPanelMenuItem Text="Dashboard"
+                                     Icon="dashboard"
+                                     Path="/"
+                                     Match="NavLinkMatch.All" />
+
+                @if (session.User.IsInRole("Admin"))
+                {
+                    <RadzenPanelMenuItem Text="Teachers"
+                                         Icon="co_present"
+                                         Path="/users?role=Teacher" />
+
+                    <RadzenPanelMenuItem Text="Student accounts"
+                                         Icon="school"
+                                         Path="/users?role=Student" />
+
+                    <RadzenPanelMenuItem Text="Background jobs"
+                                         Icon="work_history"
+                                         Path="/admin/jobs" />
+                }
+                else
+                {
+                    @if (session.User.IsInRole("Teacher") ||
+                         session.User.IsInRole("Student"))
+                    {
+                        <RadzenPanelMenuItem Text="Exams"
+                                             Icon="assignment"
+                                             Path="/exams"
+                                             Match="NavLinkMatch.All" />
+
+                        <RadzenPanelMenuItem Text="Analytics"
+                                             Icon="analytics"
+                                             Path="/analytics" />
+                    }
+
+                    @if (session.User.IsInRole("Teacher"))
+                    {
+                        <RadzenPanelMenuItem Text="Students"
+                                             Icon="school"
+                                             Path="/students" />
+
+                        <RadzenPanelMenuItem Text="Import XML"
+                                             Icon="upload_file"
+                                             Path="/imports" />
+                    }
+                }
+
+                <RadzenPanelMenuItem Text="Change password"
+                                     Icon="password"
+                                     Path="/change-password" />
+            }
+        </RadzenPanelMenu>
+    </Authorized>
+</AuthorizeView>

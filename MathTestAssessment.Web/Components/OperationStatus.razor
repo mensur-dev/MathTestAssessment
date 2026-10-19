@@ -1,0 +1,15 @@
+@if (Busy)
+{
+    <div class="operation-loading" role="status">
+        <span class="loading-spinner" aria-hidden="true"></span>
+        <span>Loading…</span>
+    </div>
+}
+@if (!string.IsNullOrEmpty(Error))
+{
+    <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false">@Error</RadzenAlert>
+}
+@code {
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string? Error { get; set; }
+}

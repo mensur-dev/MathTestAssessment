@@ -1,0 +1,68 @@
+
+<div class="exam-card-list">
+    @foreach (var exam in Exams.OrderByDescending(e => e.CreatedAtUtc).ThenBy(e => e.ExternalExamId))
+    {
+        <details class="exam-result-card" @key="exam.Id">
+            <summary>
+                <div class="exam-card-title">
+                    <small>EXAM</small>
+
+                    <strong>@exam.ExternalExamId</strong>
+
+                    <span>
+                        @exam.CreatedAtUtc.ToString("dd MMM yyyy · HH:mm") UTC
+                    </span>
+
+                    @if (StudentNames is not null || !string.IsNullOrWhiteSpace(exam.StudentName))
+                    {
+                        <span>
+                            Student: @(StudentNames?.GetValueOrDefault(exam.StudentId) ?? exam.StudentName)
+                        </span>
+                    }
+                </div>
+
+                <div class="exam-card-breakdown">
+                    <strong>@exam.Tasks.Count tasks</strong>
+
+                    <span>
+                        @ExamPresentation.Correct(exam) correct ·
+                        @ExamPresentation.Incorrect(exam) incorrect ·
+                        @ExamPresentation.Pending(exam) not evaluated
+                    </span>
+                </div>
+
+                <div class="exam-card-score">
+                    <strong>
+                        @(ExamPresentation.Correct(exam) + ExamPresentation.Incorrect(exam) == 0
+                            ? "—"
+                            : ExamPresentation.Score(exam).ToString("0.##") + "%")
+                    </strong>
+
+                    <span>Expand tasks ↓</span>
+                </div>
+            </summary>
+
+            <div class="exam-progress"
+                 role="img"
+                 aria-label="@($"Score {ExamPresentation.Score(exam)} percent")">
+
+                <span style="@($"width:{ExamPresentation.Score(exam).ToString(System.Globalization.CultureInfo.InvariantCulture)}%")"></span>
+            </div>
+
+            <ExamTaskTable Exam="exam" />
+
+            <div class="exam-card-footer">
+                <RadzenLink Path="@($"/exams/{exam.Id}")"
+                            Text="Open exam details" />
+            </div>
+        </details>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public IEnumerable<ExamDto> Exams { get; set; } = [];
+
+    [Parameter]
+    public IReadOnlyDictionary<Guid, string>? StudentNames { get; set; }
+}
